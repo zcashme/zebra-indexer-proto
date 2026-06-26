@@ -2,8 +2,6 @@
 //!
 //! Generated from `indexer.proto` (vendored from Zebra).
 //!
-//! # "It just builds" design
-//!
 //! The generated code is **committed** under `proto/__generated__/`.
 //! A normal `cargo build` (or `cargo add zebra-indexer-proto`) has no
 //! `protoc` requirement and pulls in no code-generation build dependencies.
@@ -11,10 +9,6 @@
 //! Maintainers can regenerate with:
 //!     cargo build --features regenerate
 //!
-//! # First-class client and server support
-//!
-//! Both the client and the server trait + server are re-exported at the
-//! crate root for ergonomic use.
 
 /// The raw generated module tree (package = zebra.indexer.rpc).
 pub mod zebra {
@@ -36,10 +30,26 @@ pub use zebra::indexer::rpc::indexer_server::{Indexer, IndexerServer};
 // Also expose the server module directly (like Zebra does internally).
 pub use zebra::indexer::rpc::indexer_server;
 
+/// The transport channel used by the default client. Re-exported so callers
+/// can name [`Client`] without adding `tonic` to their own manifests.
+pub use tonic::transport::Channel;
+
+/// A ready-to-use client type with the default transport pinned, so callers
+/// never have to spell `IndexerClient<Channel>`.
+///
+/// ```no_run
+/// # async {
+/// let mut client = zebra_indexer_proto::Client::connect("http://127.0.0.1:8230").await?;
+/// # let _: zebra_indexer_proto::Client = client;
+/// # Ok::<(), zebra_indexer_proto::ConnectError>(()) };
+/// ```
+pub type Client = IndexerClient<Channel>;
+
+/// The error returned by [`Client::connect`] (an alias for `tonic::transport::Error`).
+/// Re-exported so callers using `?` on a connect call don't need `tonic` in their manifest.
+pub use tonic::transport::Error as ConnectError;
+
 /// Encoded protobuf file descriptor set for this service.
-///
-/// This can be used with `tonic-reflection` to support gRPC server reflection.
-///
 /// ```
 /// let _descriptor: &[u8] = zebra_indexer_proto::FILE_DESCRIPTOR_SET;
 /// ```
