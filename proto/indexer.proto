@@ -1,41 +1,26 @@
-// Copyright (c) The Zcash Foundation.
-// Licensed under either the Apache License, Version 2.0 or the MIT License.
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-//
-// Zebra Indexer gRPC Protocol
-//
-// Defines the `Indexer` service served by Zebra on its indexer gRPC endpoint
-// (default: 127.0.0.1:8230). Provides push-based streaming for chain tip
-// changes, non-finalized block state, and mempool changes, plus on-demand
-// block fetch by hash or height from the best chain.
-//
-// Block data in `BlockAndHash.data` is Zcash consensus-encoded (the same wire
-// format used by `getblock` JSON-RPC with verbosity 0). All hash fields are
-// in display order (byte-reversed from internal block hash byte order).
-
 syntax = "proto3";
 package zebra.indexer.rpc;
 
 // Used by methods that take no arguments.
-message Empty {}
+message Empty {};
 
 // A block hash and height.
 message BlockHashAndHeight {
   // The hash of the block in display order.
   bytes hash = 1;
-
+  
   // The height of the block in the chain.
   uint32 height = 2;
-}
+};
 
 // An encoded block and its hash.
 message BlockAndHash {
   // The hash of the block in display order.
   bytes hash = 1;
-
-  // The encoded block data, in Zcash consensus serialization format.
+  
+  // The encoded block data.
   bytes data = 2;
-}
+};
 
 // A request for a single block by hash or height from the best chain.
 message BlockRequest {
@@ -45,7 +30,7 @@ message BlockRequest {
   // value is interpreted as a big-endian block height. Any other length is
   // rejected.
   bytes hash_or_height = 1;
-}
+};
 
 // A request to subscribe to non-finalized state changes.
 message NonFinalizedStateChangeRequest {
@@ -56,7 +41,7 @@ message NonFinalizedStateChangeRequest {
   // If empty, every block currently in the non-finalized state is sent, so an
   // empty request is equivalent to the previous no-argument behavior.
   repeated bytes chain_tip_hashes = 1;
-}
+};
 
 // Represents a change in the mempool.
 message MempoolChangeMessage {
@@ -65,8 +50,8 @@ message MempoolChangeMessage {
     // Represents a transaction being added to the mempool.
     ADDED = 0;
     // Represents a transaction being invalidated and rejected from the mempool.
-    INVALIDATED = 1;
-    // Represents a transaction being mined into a block on the best chain and
+    INVALIDATED  = 1;
+    // Represents a transaction being mined into a block on the best chain and 
     // removed from the mempool.
     MINED = 2;
   }
@@ -74,15 +59,15 @@ message MempoolChangeMessage {
   // The type of change that occurred.
   ChangeType change_type = 1;
 
-  // The hash of the transaction that changed, in display order.
+  // The hash of the transaction that changed.
   bytes tx_hash = 2;
 
-  // The transaction auth digest, in display order. Empty if unavailable.
+  // The transaction auth digest.
   bytes auth_digest = 3;
-}
+};
 
 service Indexer {
-  // Notifies listeners of chain tip changes.
+  // Notifies listeners of chain tip changes
   rpc ChainTipChange(Empty) returns (stream BlockHashAndHeight);
 
   // Notifies listeners of new blocks in the non-finalized state.
@@ -92,7 +77,7 @@ service Indexer {
   // block currently in the non-finalized state.
   rpc NonFinalizedStateChange(NonFinalizedStateChangeRequest) returns (stream BlockAndHash);
 
-  // Notifies listeners of mempool changes.
+  // Notifies listeners of mempool changes
   rpc MempoolChange(Empty) returns (stream MempoolChangeMessage);
 
   // Returns the block with the given hash or height from the best chain.

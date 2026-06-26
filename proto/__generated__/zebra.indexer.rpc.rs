@@ -18,7 +18,7 @@ pub struct BlockAndHash {
     /// The hash of the block in display order.
     #[prost(bytes = "vec", tag = "1")]
     pub hash: ::prost::alloc::vec::Vec<u8>,
-    /// The encoded block data, in Zcash consensus serialization format.
+    /// The encoded block data.
     #[prost(bytes = "vec", tag = "2")]
     pub data: ::prost::alloc::vec::Vec<u8>,
 }
@@ -51,10 +51,10 @@ pub struct MempoolChangeMessage {
     /// The type of change that occurred.
     #[prost(enumeration = "mempool_change_message::ChangeType", tag = "1")]
     pub change_type: i32,
-    /// The hash of the transaction that changed, in display order.
+    /// The hash of the transaction that changed.
     #[prost(bytes = "vec", tag = "2")]
     pub tx_hash: ::prost::alloc::vec::Vec<u8>,
-    /// The transaction auth digest, in display order. Empty if unavailable.
+    /// The transaction auth digest.
     #[prost(bytes = "vec", tag = "3")]
     pub auth_digest: ::prost::alloc::vec::Vec<u8>,
 }
@@ -196,7 +196,7 @@ pub mod indexer_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        /// Notifies listeners of chain tip changes.
+        /// Notifies listeners of chain tip changes
         pub async fn chain_tip_change(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
@@ -255,7 +255,7 @@ pub mod indexer_client {
                 );
             self.inner.server_streaming(req, path, codec).await
         }
-        /// Notifies listeners of mempool changes.
+        /// Notifies listeners of mempool changes
         pub async fn mempool_change(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
@@ -326,7 +326,7 @@ pub mod indexer_server {
             >
             + std::marker::Send
             + 'static;
-        /// Notifies listeners of chain tip changes.
+        /// Notifies listeners of chain tip changes
         async fn chain_tip_change(
             &self,
             request: tonic::Request<super::Empty>,
@@ -358,7 +358,7 @@ pub mod indexer_server {
             >
             + std::marker::Send
             + 'static;
-        /// Notifies listeners of mempool changes.
+        /// Notifies listeners of mempool changes
         async fn mempool_change(
             &self,
             request: tonic::Request<super::Empty>,
