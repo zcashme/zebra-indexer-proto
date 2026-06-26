@@ -1,10 +1,80 @@
 //! Rust bindings for Zebra's indexer gRPC interface.
 //!
-//! Generated from `indexer.proto` in the Zebra repository.
-//! This crate provides the gRPC client and server types for Zebra's
-//! Indexer service, with zero Zebra dependencies.
+//! Generated from `indexer.proto` (vendored from Zebra).
+//!
+//! # "It just builds" design
+//!
+//! The generated code is **committed** under `proto/__generated__/`.
+//! A normal `cargo build` (or `cargo add zebra-indexer-proto`) has no
+//! `protoc` requirement and pulls in no code-generation build dependencies.
+//!
+//! Maintainers can regenerate with:
+//!     cargo build --features regenerate
+//!
+//! # First-class client and server support
+//!
+//! Both the client and the server trait + server are re-exported at the
+//! crate root for ergonomic use.
 
-tonic::include_proto!("zebra.indexer.rpc");
+/// The raw generated module tree (package = zebra.indexer.rpc).
+pub mod zebra {
+    pub mod indexer {
+        pub mod rpc {
+            include!("../proto/__generated__/zebra.indexer.rpc.rs");
+        }
+    }
+}
 
-// Re-export the client for convenience
-pub use indexer_client::IndexerClient;
+// Re-export all generated items (messages, enums, etc.) at the crate root
+// for the most convenient usage (matching `tonic::include_proto!` ergonomics).
+pub use zebra::indexer::rpc::*;
+
+// First-class, explicit re-exports for the gRPC service.
+pub use zebra::indexer::rpc::indexer_client::IndexerClient;
+pub use zebra::indexer::rpc::indexer_server::{Indexer, IndexerServer};
+
+// Also expose the server module directly (like Zebra does internally).
+pub use zebra::indexer::rpc::indexer_server;
+
+/// Encoded protobuf file descriptor set for this service.
+///
+/// This can be used with `tonic-reflection` to support gRPC server reflection.
+///
+/// ```
+/// let _descriptor: &[u8] = zebra_indexer_proto::FILE_DESCRIPTOR_SET;
+/// ```
+pub const FILE_DESCRIPTOR_SET: &[u8] =
+    include_bytes!("../proto/__generated__/indexer_descriptor.bin");
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn messages_are_usable() {
+        let _empty = Empty {};
+        let tip = BlockHashAndHeight {
+            hash: vec![1; 32],
+            height: 123456,
+        };
+        assert_eq!(tip.height, 123456);
+    }
+
+    #[test]
+    fn client_and_server_types_exist() {
+        // Just ensure the symbols are public and have the expected names.
+        fn _assert_client(_: IndexerClient<tonic::transport::Channel>) {}
+
+        // These are the main types users need to implement or construct servers.
+        let _ = std::any::type_name::<IndexerServer<()>>();
+        // The trait name is available for `impl Indexer for MyType`.
+        let _name = std::any::type_name::<fn() -> IndexerServer<()>>();
+    }
+
+    #[test]
+    fn descriptor_is_non_empty() {
+        assert!(!FILE_DESCRIPTOR_SET.is_empty());
+        // Very rough sanity: protobuf descriptors often start with a length or specific bytes.
+        assert!(FILE_DESCRIPTOR_SET.len() > 100);
+    }
+}
