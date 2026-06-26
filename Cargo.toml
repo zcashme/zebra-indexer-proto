@@ -1,0 +1,22 @@
+[package]
+name = "zebra-indexer-proto"
+version = "0.1.2"
+edition = "2021"
+rust-version = "1.85"
+description = "Rust bindings for Zebra's indexer gRPC protocol buffers"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/zcashme/zebra-indexer-proto"
+keywords = ["zebra", "zcash", "grpc", "indexer"]
+categories = ["cryptography::cryptocurrencies"]
+
+[dependencies]
+prost = "0.14"
+tonic = "0.14"
+tonic-prost = "0.14"
+
+[build-dependencies]
+tonic-prost-build = "0.14"
+
+[lib]
+name = "zebra_indexer_proto"
