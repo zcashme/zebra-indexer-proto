@@ -24,6 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         //   proto/__generated__/zebra.indexer.rpc.rs
         //   proto/__generated__/indexer_descriptor.bin
         tonic_prost_build::configure()
+            .type_attribute(".", "#[derive(serde::Deserialize, serde::Serialize)]")
             .out_dir(&generated_dir)
             .file_descriptor_set_path(generated_dir.join("indexer_descriptor.bin"))
             .compile_protos(&["proto/indexer.proto"], &["proto/"])?;
