@@ -23,11 +23,12 @@ pub mod zebra {
 // for the most convenient usage (matching `tonic::include_proto!` ergonomics).
 pub use zebra::indexer::rpc::*;
 
-// First-class, explicit re-exports for the gRPC service.
+// Re-exports of the generated gRPC client/server types. This is just what
+// `tonic-prost-build` emits from `proto/indexer.proto` — the same code Zebra
+// generates internally. No abstraction layer on top; both sides re-exported
+// verbatim so downstream test stubs / Zebra-compatible nodes can use them.
 pub use zebra::indexer::rpc::indexer_client::IndexerClient;
 pub use zebra::indexer::rpc::indexer_server::{Indexer, IndexerServer};
-
-// Also expose the server module directly (like Zebra does internally).
 pub use zebra::indexer::rpc::indexer_server;
 
 /// The transport channel used by the default client. Re-exported so callers
@@ -36,20 +37,10 @@ pub use tonic::transport::Channel;
 
 /// A ready-to-use client type with the default transport pinned, so callers
 /// never have to spell `IndexerClient<Channel>`.
-///
-/// ```no_run
-/// # async {
-/// let mut client = zebra_indexer_proto::ZebraClient::connect("http://127.0.0.1:8230").await?;
-/// # let _: zebra_indexer_proto::ZebraClient = client;
-/// # Ok::<(), zebra_indexer_proto::ConnectError>(()) };
-/// ```
 pub type ZebraClient = IndexerClient<Channel>;
 
-/// Back-compat alias for [`ZebraClient`] (kept since 2.1.0; prefer `ZebraClient`).
-pub type Client = IndexerClient<Channel>;
-
-/// The error returned by [`ZebraClient::connect`] (an alias for `tonic::transport::Error`).
-/// Re-exported so callers using `?` on a connect call don't need `tonic` in their manifest.
+/// The error returned by [`ZebraClient::connect`]. Re-exported so callers
+/// using `?` on a connect call don't need `tonic` in their manifest.
 pub use tonic::transport::Error as ConnectError;
 
 /// Encoded protobuf file descriptor set for this service.

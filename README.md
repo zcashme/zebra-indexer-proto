@@ -10,7 +10,8 @@ Rust bindings for Zebra's indexer gRPC interface.
   - No `protoc` installation required.
   - No heavy build-time code generation dependencies pulled in.
 - The generated code is committed (see `proto/__generated__/`).
-- Both **client** and **server** sides are first-class.
+- The bindings are just a copy of what Zebra generates internally — no redesign, no
+  extra abstraction layer. Client *and* server types are re-exported verbatim.
 - Clear, low-friction maintenance process when the proto changes in Zebra.
 
 This pattern is heavily inspired by the `lightwallet-protocol` crate and how Zebra itself manages its internal gRPC bindings.
@@ -19,7 +20,7 @@ This pattern is heavily inspired by the `lightwallet-protocol` crate and how Zeb
 
 ```toml
 [dependencies]
-zebra-indexer-proto = "2.3"
+zebra-indexer-proto = "2.4"
 ```
 
 No `tonic` dependency needed in your crate — `ZebraClient` pins the transport for you.
@@ -39,6 +40,12 @@ while let Some(tip) = stream.message().await? {
 ```
 
 ### Implementing a Server
+
+This crate re-exports the server trait verbatim from the generated bindings — i.e.
+the same `Indexer` trait Zebra implements internally. It's here mainly so downstream
+test suites can spin up a stub `Indexer` (or a third-party Zebra-compatible node can
+serve the same gRPC interface). You don't implement anything new; you just fill in
+the 4 generated methods exactly as Zebra does:
 
 ```rust
 use zebra_indexer_proto::indexer_server::{Indexer, IndexerServer};
