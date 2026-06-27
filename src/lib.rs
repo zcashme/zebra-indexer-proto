@@ -31,7 +31,7 @@ pub use zebra::indexer::rpc::indexer_server::{Indexer, IndexerServer};
 pub use zebra::indexer::rpc::indexer_server;
 
 /// The transport channel used by the default client. Re-exported so callers
-/// can name [`Client`] without adding `tonic` to their own manifests.
+/// can name [`ZebraClient`] without adding `tonic` to their own manifests.
 pub use tonic::transport::Channel;
 
 /// A ready-to-use client type with the default transport pinned, so callers
@@ -39,13 +39,16 @@ pub use tonic::transport::Channel;
 ///
 /// ```no_run
 /// # async {
-/// let mut client = zebra_indexer_proto::Client::connect("http://127.0.0.1:8230").await?;
-/// # let _: zebra_indexer_proto::Client = client;
+/// let mut client = zebra_indexer_proto::ZebraClient::connect("http://127.0.0.1:8230").await?;
+/// # let _: zebra_indexer_proto::ZebraClient = client;
 /// # Ok::<(), zebra_indexer_proto::ConnectError>(()) };
 /// ```
+pub type ZebraClient = IndexerClient<Channel>;
+
+/// Back-compat alias for [`ZebraClient`] (kept since 2.1.0; prefer `ZebraClient`).
 pub type Client = IndexerClient<Channel>;
 
-/// The error returned by [`Client::connect`] (an alias for `tonic::transport::Error`).
+/// The error returned by [`ZebraClient::connect`] (an alias for `tonic::transport::Error`).
 /// Re-exported so callers using `?` on a connect call don't need `tonic` in their manifest.
 pub use tonic::transport::Error as ConnectError;
 

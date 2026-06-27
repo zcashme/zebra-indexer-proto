@@ -19,16 +19,17 @@ This pattern is heavily inspired by the `lightwallet-protocol` crate and how Zeb
 
 ```toml
 [dependencies]
-zebra-indexer-proto = "0.1"
-tonic = "0.14"
+zebra-indexer-proto = "2.3"
 ```
+
+No `tonic` dependency needed in your crate — `ZebraClient` pins the transport for you.
 
 ### Client
 
 ```rust
-use zebra_indexer_proto::{IndexerClient, Empty};
+use zebra_indexer_proto::{ZebraClient, Empty};
 
-let mut client = IndexerClient::connect("http://127.0.0.1:8230").await?;
+let mut client = ZebraClient::connect("http://127.0.0.1:8230").await?;
 
 // Chain tip change stream
 let mut stream = client.chain_tip_change(Empty {}).await?.into_inner();
@@ -50,6 +51,20 @@ impl Indexer for MyService {
 }
 
 let server = IndexerServer::new(my_service);
+```
+
+### Serialization (serde)
+
+Every generated message type derives `serde::Serialize` and `serde::Deserialize`, so you can
+re-emit received payloads as JSON, cache them with `bincode`, snapshot-test them, etc. — no
+hand-rolled encoders:
+
+```rust
+use zebra_indexer_proto::BlockHashAndHeight;
+
+let tip = BlockHashAndHeight { hash: vec![1; 32], height: 123456 };
+let json = serde_json::to_string(&tip)?;           // {"hash":[1,1,…],"height":123456}
+let back: BlockHashAndHeight = serde_json::from_str(&json)?;
 ```
 
 ### Reflection (optional but recommended)
@@ -102,14 +117,10 @@ proto/
 
 2. Regenerate (requires `protoc`):
    ```bash
-   make regenerate
-   # or
    cargo build --features regenerate
    ```
 
 3. Commit the changes to both `proto/indexer.proto` and the two files under `__generated__/`.
-
-A `Makefile` with helper targets is provided.
 
 ## Features
 
