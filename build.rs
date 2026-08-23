@@ -29,7 +29,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .file_descriptor_set_path(generated_dir.join("indexer_descriptor.bin"))
             .compile_protos(&["proto/indexer.proto"], &["proto/"])?;
 
-        println!("cargo:warning=Regenerated zebra-indexer-proto bindings into proto/__generated__/");
+        println!(
+            "cargo:warning=Regenerated zebra-indexer-proto bindings into proto/__generated__/"
+        );
     }
 
     Ok(())

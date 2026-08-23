@@ -3,6 +3,41 @@
 Notable changes to `zebra-indexer-proto`. The crate tracks Zebra's indexer
 gRPC interface, not Zebra's own version numbers.
 
+## 2.5.0 (2026-06-27)
+
+- Added the typed mempool layer:
+  - `MempoolChangeKind` — the `ChangeType` enumeration prost generates from
+    the proto, re-exported under the name Zebra's own stack uses for the
+    same taxonomy. The 0 = Added / 1 = Invalidated / 2 = Mined correspondence
+    is now owned by code generation instead of by comments and hand-written
+    matches downstream.
+  - `MempoolChangeMessage::kind()` — decodes `change_type` to
+    `Option<MempoolChangeKind>`, `None` on unknown wire values (proto3 enums
+    are open).
+  - `MempoolChangeMessage::tx_hash_display_order()` and
+    `auth_digest_display_order()` — `Some` iff the field is exactly 32 bytes.
+  - `BlockHashAndHeight::hash_display_order()` — the same 32-byte discipline
+    for tip hashes.
+  - `NonFinalizedStateChangeRequest::chain_tip_hashes_display_order()` —
+    `Some` iff every hash is exactly 32 bytes, mirroring the server's up-front
+    validation.
+  - `MAX_CHAIN_TIP_HASHES` — the server's limit on chain tip hashes per
+    resume request (Zebra's `MAX_NON_FINALIZED_CHAIN_FORKS`); larger requests
+    are rejected with `invalid_argument`.
+- Added a "Protocol behavior notes" section to the crate docs: no initial
+  message on `chain_tip_change`, resume-request limits, and stream
+  termination semantics (drop on close or slow consumption — resubscribe
+  rather than treat as fatal). These are Zebra implementation choices, noted
+  as such.
+- CI: install protoc (ubuntu runners don't ship it; `--all-features` enables
+  `regenerate`, which needs it for both tests and the bindings check).
+- proto: documented `tx_hash` and `auth_digest` as display order (matching
+  every other hash in the file and Zebra's server, which sends
+  `mined_id().bytes_in_display_order()`), and noted `auth_digest` is empty
+  for transactions without one. The regenerated bindings carry the comments.
+  This is a deliberate divergence from Zebra's in-tree copy until it syncs
+  the two comment lines — the daily CI sync check fails in the interim.
+
 ## 2.4.0 (2026-06-27)
 
 - Dropped the `Client` back-compat alias.

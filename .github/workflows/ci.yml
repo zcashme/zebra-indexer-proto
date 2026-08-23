@@ -22,14 +22,19 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
+
+      # The runner image does NOT ship protoc. It's needed for both the tests
+      # (--all-features enables `regenerate`, which runs build.rs codegen) and
+      # the bindings-match check below.
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Tests
         run: cargo test --all-features
 
-      # protoc ships with the ubuntu runner image.
       - name: Committed bindings match the proto
         run: |
           cargo build --features regenerate

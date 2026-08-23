@@ -59,10 +59,11 @@ message MempoolChangeMessage {
   // The type of change that occurred.
   ChangeType change_type = 1;
 
-  // The hash of the transaction that changed.
+  // The hash of the transaction that changed, in display order.
   bytes tx_hash = 2;
 
-  // The transaction auth digest.
+  // The transaction auth digest, in display order. Empty for transactions
+  // without an auth digest.
   bytes auth_digest = 3;
 };
 

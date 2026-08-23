@@ -14,7 +14,7 @@ them. `
 
 ```toml
 [dependencies]
-zebra-indexer-proto = "2.4"
+zebra-indexer-proto = "2.5"
 ```
 
 `ZebraClient` pins the transport for you without having to keep a 'tonic' dependency.
@@ -30,6 +30,28 @@ let mut client = ZebraClient::connect("http://127.0.0.1:8230").await?;
 let mut stream = client.chain_tip_change(Empty {}).await?.into_inner();
 while let Some(tip) = stream.message().await? {
     println!("tip: height={} hash={:x}", tip.height, tip.hash);
+}
+```
+
+### Typed mempool changes
+
+`change_type` is a raw `i32` on the wire (prost's convention), but the crate
+names its meaning for you. `kind()` returns `None` for values a newer Zebra
+might add:
+
+```rust
+use zebra_indexer_proto::{Empty, MempoolChangeKind, ZebraClient};
+
+let mut stream = client.mempool_change(Empty {}).await?.into_inner();
+while let Some(change) = stream.message().await? {
+    match change.kind() {
+        Some(MempoolChangeKind::Added) => { /* tx entered the mempool */ }
+        Some(MempoolChangeKind::Invalidated) => { /* pending observations withdrawn */ }
+        Some(MempoolChangeKind::Mined) => { /* confirmed into a best-chain block */ }
+        None => { /* unknown value from a newer Zebra */ }
+    }
+    // Display order, as with every other hash in this protocol.
+    let tx_hash = change.tx_hash_display_order().expect("32 bytes");
 }
 ```
 
@@ -81,10 +103,12 @@ let reflection = tonic_reflection::server::Builder::configure()
 
 ## Staying in sync with Zebra
 
-`proto/indexer.proto` is a copy of
-[zebra-rpc/proto/indexer.proto](https://github.com/ZcashFoundation/zebra/blob/main/zebra-rpc/proto/indexer.proto).
-CI diffs the two daily and fails if they drift, so upstream changes surface
-here quickly.
+`proto/indexer.proto` is a byte-level copy of
+[zebra-rpc/proto/indexer.proto](https://github.com/ZcashFoundation/zebra/blob/main/zebra-rpc/proto/indexer.proto)
+(Zebra vendored this crate's file for v6.3.0, so changes can land in either
+place — whoever changes it opens the sync PR). CI diffs the two daily and
+fails if they drift, so changes surface here quickly. When the change lands
+here first, keep the diff open on the Zebra side until it syncs.
 
 To update the bindings:
 
