@@ -1,29 +1,23 @@
 # zebra-indexer-proto
 
-Rust bindings for Zebra's indexer gRPC interface.
+Rust bindings for Zebra's indexer gRPC interface — the small set of streaming
+and block-fetch RPCs Zebra serves on its indexer endpoint (default
+`127.0.0.1:8230`).
 
-**The design goal of this crate is the absolute best "it just builds" experience for downstream users**, combined with a first-class, maintainable story for the protocol itself.
+## Why this crate exists
 
-## Philosophy
+Zebra defines the interface in `zebra-rpc/proto/indexer.proto` and generates
+its own bindings internally. This crate vendors it, generates the bindings once, and commits
+them. `
 
-- Normal `cargo add zebra-indexer-proto && cargo build` must **just work**.
-  - No `protoc` installation required.
-  - No heavy build-time code generation dependencies pulled in.
-- The generated code is committed (see `proto/__generated__/`).
-- The bindings are just a copy of what Zebra generates internally — no redesign, no
-  extra abstraction layer. Client *and* server types are re-exported verbatim.
-- Clear, low-friction maintenance process when the proto changes in Zebra.
-
-This pattern is heavily inspired by the `lightwallet-protocol` crate and how Zebra itself manages its internal gRPC bindings.
-
-## Quick Start
+## Quick start
 
 ```toml
 [dependencies]
 zebra-indexer-proto = "2.4"
 ```
 
-No `tonic` dependency needed in your crate — `ZebraClient` pins the transport for you.
+`ZebraClient` pins the transport for you without having to keep a 'tonic' dependency.
 
 ### Client
 
@@ -39,42 +33,33 @@ while let Some(tip) = stream.message().await? {
 }
 ```
 
-### Implementing a Server
+### Implementing a server
 
-This crate re-exports the server trait verbatim from the generated bindings — i.e.
-the same `Indexer` trait Zebra implements internally. It's here mainly so downstream
-test suites can spin up a stub `Indexer` (or a third-party Zebra-compatible node can
-serve the same gRPC interface). You don't implement anything new; you just fill in
-the 4 generated methods exactly as Zebra does:
+The crate re-exports the server trait verbatim from the generated bindings i.e. the `Indexer` trait Zebra implements internally. Fill in the four
+generated methods exactly as Zebra does.
 
 ```rust
 use zebra_indexer_proto::indexer_server::{Indexer, IndexerServer};
-use zebra_indexer_proto::{BlockAndHash, BlockHashAndHeight, /* ... */ };
 
 #[tonic::async_trait]
 impl Indexer for MyService {
-    type ChainTipChangeStream = ...;
-    // implement the 4 methods...
+    type ChainTipChangeStream = /* ... */;
+    // the four methods ...
 }
 
 let server = IndexerServer::new(my_service);
 ```
 
-### Serialization (serde)
+### Serde
 
-Every generated message type derives `serde::Serialize` and `serde::Deserialize`, so you can
-re-emit received payloads as JSON, cache them with `bincode`, snapshot-test them, etc. — no
-hand-rolled encoders:
+Every generated message derives `serde::Serialize` and `serde::Deserialize`:
 
 ```rust
-use zebra_indexer_proto::BlockHashAndHeight;
-
-let tip = BlockHashAndHeight { hash: vec![1; 32], height: 123456 };
-let json = serde_json::to_string(&tip)?;           // {"hash":[1,1,…],"height":123456}
+let json = serde_json::to_string(&tip)?;            // {"hash":[1,1,...],"height":123456}
 let back: BlockHashAndHeight = serde_json::from_str(&json)?;
 ```
 
-### Reflection (optional but recommended)
+### Reflection
 
 ```rust
 use zebra_indexer_proto::FILE_DESCRIPTOR_SET;
@@ -85,57 +70,37 @@ let reflection = tonic_reflection::server::Builder::configure()
     .unwrap();
 ```
 
-## Protocol Source & Versioning
+## The interface
 
-The `proto/indexer.proto` is the source of truth and is kept in sync with:
+| RPC | Type | What it does |
+|---|---|---|
+| `ChainTipChange` | stream | push `(hash, height)` on every best-chain tip change |
+| `NonFinalizedStateChange` | stream | stream blocks in non-finalized state, resumable via known tip hashes |
+| `MempoolChange` | stream | notify on tx added / invalidated / mined |
+| `GetBlock` | unary | fetch a block by hash (32 bytes, display order) or height (4 bytes, big-endian) |
 
-> [ZcashFoundation/zebra](https://github.com/ZcashFoundation/zebra/blob/main/zebra-rpc/proto/indexer.proto)
+## Staying in sync with Zebra
 
-This crate is versioned independently of Zebra. It tracks the gRPC interface, not Zebra's internal crate versions.
+`proto/indexer.proto` is a copy of
+[zebra-rpc/proto/indexer.proto](https://github.com/ZcashFoundation/zebra/blob/main/zebra-rpc/proto/indexer.proto).
+CI diffs the two daily and fails if they drift, so upstream changes surface
+here quickly.
 
-## Methods
+To update the bindings:
 
-| RPC                        | Type      | Purpose |
-|----------------------------|-----------|---------|
-| `ChainTipChange`           | stream    | Push `(hash, height)` on every best chain tip change |
-| `NonFinalizedStateChange`  | stream    | Stream full blocks in the non-finalized state (with resume support) |
-| `MempoolChange`            | stream    | Notify on tx added / invalidated / mined |
-| `GetBlock`                 | unary     | Fetch a block by hash (32 bytes) or height (4 bytes big-endian) |
-
-## Maintenance (for contributors)
-
-The committed generated files live in:
-
-```
-proto/
-├── indexer.proto
-└── __generated__/
-    ├── zebra.indexer.rpc.rs
-    └── indexer_descriptor.bin
+```bash
+cp ../zebra/zebra-rpc/proto/indexer.proto proto/indexer.proto
+cargo build --features regenerate   # needs protoc; maintainers only
 ```
 
-### Updating the bindings
+Then commit `proto/indexer.proto` and everything under `proto/__generated__/`,
+bump the version, and publish. Normal builds never need the `regenerate`
+feature — it exists solely for this workflow.
 
-1. Update the proto definition (usually by copying from Zebra at a release/tag):
-   ```bash
-   # Example
-   cp ../zebra/zebra-rpc/proto/indexer.proto proto/indexer.proto
-   ```
+## Changelog
 
-2. Regenerate (requires `protoc`):
-   ```bash
-   cargo build --features regenerate
-   ```
-
-3. Commit the changes to both `proto/indexer.proto` and the two files under `__generated__/`.
-
-## Features
-
-| Feature     | Effect |
-|-------------|--------|
-| (default)   | Uses committed generated code. Pure "it just builds" experience. |
-| `regenerate` | Regenerates `proto/__generated__/*` from `proto/indexer.proto`. For maintainers only. |
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-MIT OR Apache-2.0 (same as Zebra).
+MIT OR Apache-2.0 — same as Zebra.
