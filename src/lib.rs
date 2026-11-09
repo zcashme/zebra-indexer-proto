@@ -80,7 +80,8 @@ impl MempoolChangeMessage {
     /// Returns the kind of change, or `None` if the wire value is unknown.
     ///
     /// Unknown values are representable: proto3 enums are open, and a newer
-    /// Zebra may report a kind this version of the crate predates.
+    /// Zebra may report a kind this version of the crate predates. The
+    /// generated `change_type()` returns `Added` for an unknown value.
     pub fn kind(&self) -> Option<MempoolChangeKind> {
         MempoolChangeKind::try_from(self.change_type).ok()
     }
