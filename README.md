@@ -121,8 +121,8 @@ let reflection = tonic_reflection::server::Builder::configure()
 `proto/indexer.proto` is a byte-level copy of
 [zebra-rpc/proto/indexer.proto](https://github.com/ZcashFoundation/zebra/blob/main/zebra-rpc/proto/indexer.proto)
 at a tagged Zebra release, currently v7.0.0. The Zebra server facts in the
-crate docs cite that release too. CI diffs the proto against Zebra's `main`
-daily, so an upstream change surfaces before the next release.
+crate docs cite that release too. CI diffs the proto against the release
+named by `ZEBRA_TAG` in `.github/workflows/ci.yml`.
 
 To update the bindings:
 
@@ -131,8 +131,9 @@ cp ../zebra/zebra-rpc/proto/indexer.proto proto/indexer.proto
 cargo build --features regenerate   # needs protoc; maintainers only
 ```
 
-Then commit `proto/indexer.proto` and everything under `proto/__generated__/`,
-bump the version, and publish. Normal builds never need the `regenerate`
+Copy from the Zebra release you are moving to, set `ZEBRA_TAG` to it, and
+recheck each Zebra server fact's citation. Then commit `proto/indexer.proto`
+and everything under `proto/__generated__/`, bump the version, and publish. Normal builds never need the `regenerate`
 feature — it exists solely for this workflow.
 
 ## Changelog
