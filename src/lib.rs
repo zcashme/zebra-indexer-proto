@@ -96,6 +96,14 @@ impl BlockHashAndHeight {
     }
 }
 
+impl BlockAndHash {
+    /// Returns the block hash in display order, or `None` if the field is not
+    /// 32 bytes.
+    pub fn hash_display_order(&self) -> Option<&[u8; 32]> {
+        hash32(&self.hash)
+    }
+}
+
 /// The maximum number of chain tip hashes a [`NonFinalizedStateChangeRequest`]
 /// may carry.
 ///
@@ -198,6 +206,13 @@ mod tests {
             height: 1,
         };
         assert_eq!(tip.hash_display_order(), Some(&[2; 32]));
+
+        let block = BlockAndHash {
+            hash: vec![4; 32],
+            data: Vec::new(),
+        };
+        assert_eq!(block.hash_display_order(), Some(&[4; 32]));
+        assert_eq!(BlockAndHash::default().hash_display_order(), None);
         assert_eq!(BlockHashAndHeight::default().hash_display_order(), None);
     }
 
