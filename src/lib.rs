@@ -103,7 +103,7 @@ impl MempoolChangeMessage {
 }
 
 impl BlockHashAndHeight {
-    /// A tip whose hash is given in display order.
+    /// A block hash, in display order, and its height.
     pub fn new(hash: [u8; 32], height: u32) -> Self {
         Self {
             hash: hash.to_vec(),
@@ -119,7 +119,7 @@ impl BlockHashAndHeight {
 }
 
 impl BlockAndHash {
-    /// A consensus-serialized block and its hash in display order.
+    /// An encoded block and its hash, in display order.
     pub fn new(hash: [u8; 32], data: Vec<u8>) -> Self {
         Self {
             hash: hash.to_vec(),
@@ -351,13 +351,13 @@ mod tests {
         assert_eq!(change.tx_hash_display_order(), Some(&[1; 32]));
         assert_eq!(change.auth_digest_display_order(), Some(&[2; 32]));
 
-        let legacy = MempoolChangeMessage::new(MempoolChangeKind::Added, [1; 32], None);
-        assert!(legacy.auth_digest.is_empty());
-        assert_eq!(legacy.auth_digest_display_order(), None);
+        let no_digest = MempoolChangeMessage::new(MempoolChangeKind::Added, [1; 32], None);
+        assert!(no_digest.auth_digest.is_empty());
+        assert_eq!(no_digest.auth_digest_display_order(), None);
     }
 
     #[test]
-    fn a_resume_request_holds_at_most_the_limit() {
+    fn a_request_carries_at_most_max_chain_tip_hashes() {
         let full = NonFinalizedStateChangeRequest::new(vec![[3; 32]; MAX_CHAIN_TIP_HASHES])
             .expect("the limit itself is accepted");
         assert_eq!(
