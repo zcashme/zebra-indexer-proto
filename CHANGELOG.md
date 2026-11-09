@@ -3,6 +3,41 @@
 Notable changes to `zebra-indexer-proto`. The crate tracks Zebra's indexer
 gRPC interface, not Zebra's own version numbers.
 
+## 3.0.0 (2026-11-09)
+
+Checked against Zebra v7.0.0.
+
+- Breaking: `tx_hash_display_order`, `auth_digest_display_order` and
+  `BlockHashAndHeight::hash_display_order` return `Option<&[u8; 32]>`
+  instead of `Option<&[u8]>`. `None` still means the field is not 32 bytes,
+  which includes an empty auth digest.
+- Breaking: `chain_tip_hashes_display_order` yields `&[u8; 32]` instead of
+  `&[u8]`, and returns `None` above `MAX_CHAIN_TIP_HASHES` as well as for a
+  hash that is not 32 bytes.
+- Breaking: `MAX_CHAIN_TIP_HASHES` is 100, the limit Zebra enforces on every
+  network (`MAX_NON_FINALIZED_CHAIN_FORKS_TEST_NETWORKS`). It was 10.
+- Added `HashOrHeight`, `MAX_BLOCK_HEIGHT`, `BlockRequest::new` (`None` for a
+  height above `MAX_BLOCK_HEIGHT`) and `BlockRequest::hash_or_height()`.
+- Added `BlockAndHash::hash_display_order()`.
+- Added constructors that encode each field rule:
+  `BlockHashAndHeight::new`, `BlockAndHash::new`,
+  `NonFinalizedStateChangeRequest::new` (`None` above the limit) and
+  `MempoolChangeMessage::new`.
+- The "Protocol behavior notes" are "Zebra server facts", each citing Zebra
+  v7.0.0. Corrected: `chain_tip_change` sends the current tip at once
+  whenever Zebra has a tip; a 60-second send timeout ends a stream cleanly
+  with no status, while a `mempool_change` consumer more than 20 changes
+  behind gets `unavailable`. Added: Zebra's own client resubscribes after
+  any stream end.
+- CI diffs the proto against the Zebra release named by `ZEBRA_TAG`
+  (v7.0.0) instead of `main`, with no daily schedule.
+- proto: byte-identical to Zebra v7.0.0 again. The two `tx_hash` and
+  `auth_digest` comment lines are Zebra's; the display-order fact moved to
+  the accessor docs. Regenerated bindings carry `#[allow(clippy::all)]`,
+  which `tonic-prost-build` 0.14.9 adds to every generated type.
+- `Cargo.lock` is committed and CI builds with `--locked`, so regenerating
+  the bindings uses the same `tonic-prost-build` everywhere.
+
 ## 2.5.0 (2026-06-27)
 
 - Added the typed mempool layer:

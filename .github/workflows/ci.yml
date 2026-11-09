@@ -1,13 +1,6 @@
-# Simple CI: test, and stay honest about the two things this crate promises:
+# Tests, and the two things this crate promises:
 #   1. the committed generated code matches proto/indexer.proto
-#   2. proto/indexer.proto matches Zebra upstream
-#
-# The schedule runs daily. Zebra doesn't touch its indexer.proto often — most
-# days this is green and silent. The day Zebra adds a 5th RPC, the sync check
-# fails and you'll know to copy the proto over, regenerate, and publish.
-#
-# NOTE: if this crate ever becomes the interface of record (new RPCs landing
-# here first, Zebra copying from us), the sync check below inverts or goes away.
+#   2. proto/indexer.proto matches Zebra's at ZEBRA_TAG
 
 name: CI
 
@@ -15,8 +8,9 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "0 6 * * *"
+
+env:
+  ZEBRA_TAG: v7.0.0
 
 jobs:
   ci:
@@ -33,18 +27,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Tests
-        run: cargo test --all-features
+        run: cargo test --locked --all-features
 
       - name: Committed bindings match the proto
         run: |
-          cargo build --features regenerate
+          cargo build --locked --features regenerate
           git diff --exit-code -- proto/__generated__/
 
-      - name: Proto is in sync with Zebra upstream
+      - name: Proto matches Zebra at ZEBRA_TAG
         run: |
           curl -fsSL -o "$RUNNER_TEMP/indexer.proto" \
-            https://raw.githubusercontent.com/ZcashFoundation/zebra/main/zebra-rpc/proto/indexer.proto
+            "https://raw.githubusercontent.com/ZcashFoundation/zebra/$ZEBRA_TAG/zebra-rpc/proto/indexer.proto"
           if ! diff proto/indexer.proto "$RUNNER_TEMP/indexer.proto"; then
-            echo "::error::proto/indexer.proto drifted from Zebra upstream — copy it over, cargo build --features regenerate, bump the version, publish"
+            echo "::error::proto/indexer.proto differs from Zebra $ZEBRA_TAG"
             exit 1
           fi
