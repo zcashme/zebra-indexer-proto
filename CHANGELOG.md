@@ -25,8 +25,10 @@ Checked against Zebra v7.0.0.
   consumer's stream ends cleanly with no status.
 - proto: byte-identical to Zebra v7.0.0 again. The two `tx_hash` and
   `auth_digest` comment lines are Zebra's; the display-order fact moved to
-  the accessor docs. Regenerated bindings carry `#[allow(clippy::all)]` from
-  the current `prost-build`.
+  the accessor docs. Regenerated bindings carry `#[allow(clippy::all)]`,
+  which `tonic-prost-build` 0.14.9 adds to every generated type.
+- `Cargo.lock` is committed and CI builds with `--locked`, so regenerating
+  the bindings uses the same `tonic-prost-build` everywhere.
 
 ## 2.5.0 (2026-06-27)
 

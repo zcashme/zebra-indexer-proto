@@ -33,11 +33,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Tests
-        run: cargo test --all-features
+        run: cargo test --locked --all-features
 
       - name: Committed bindings match the proto
         run: |
-          cargo build --features regenerate
+          cargo build --locked --features regenerate
           git diff --exit-code -- proto/__generated__/
 
       - name: Proto is in sync with Zebra upstream
