@@ -9,23 +9,21 @@
 //! Maintainers can regenerate with:
 //!     cargo build --features regenerate
 //!
-//! # Protocol behavior notes
+//! # Zebra server facts
 //!
-//! Facts about how Zebra's server behaves that the wire types alone don't
-//! express. These are implementation choices, not wire format: they can
-//! change in Zebra without a proto change.
+//! How Zebra's server behaves where the proto is silent, as of Zebra
+//! v7.0.0 (`zebra-rpc/src/indexer/methods.rs`).
 //!
-//! - `chain_tip_change` sends **no initial message**: a fresh subscriber
-//!   doesn't learn the current tip until it *changes*. The protocol has no
-//!   RPC to fetch the current tip, so a client that needs it at connect time
-//!   must obtain it from elsewhere and treat the stream as change-only.
-//! - `non_finalized_state_change` requests carrying more than
-//!   [`MAX_CHAIN_TIP_HASHES`] hashes, or any hash that is not 32 bytes, are
-//!   rejected up front with `invalid_argument`.
-//! - Streams end with status `unavailable` when Zebra's internal channels
-//!   close, and a consumer too slow to drain Zebra's per-subscriber buffer
-//!   (64 messages, 60-second send timeout) has its stream dropped. A stream
-//!   ending is a resubscribe signal, not a terminal error.
+//! - `chain_tip_change` sends no initial message: the first message is the
+//!   first tip change after subscribing (line 57).
+//! - `non_finalized_state_change` rejects more than
+//!   [`MAX_CHAIN_TIP_HASHES`] hashes, or any hash that is not 32 bytes,
+//!   with `invalid_argument` (lines 302 and 319).
+//! - A stream ends with `unavailable` when Zebra's internal channel closes
+//!   or the subscription fails (lines 89, 127, 168, 234).
+//! - A stream ends cleanly, with no status, when the consumer leaves a
+//!   message unsent for 60 seconds behind a 64-message buffer (lines 23,
+//!   31, 75, 154, 219).
 //!
 
 pub mod zebra {
