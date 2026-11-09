@@ -3,6 +3,31 @@
 Notable changes to `zebra-indexer-proto`. The crate tracks Zebra's indexer
 gRPC interface, not Zebra's own version numbers.
 
+## 3.0.0 (2026-11-09)
+
+Checked against Zebra v7.0.0.
+
+- Breaking: `tx_hash_display_order`, `auth_digest_display_order`,
+  `BlockHashAndHeight::hash_display_order` and
+  `chain_tip_hashes_display_order` return `&[u8; 32]` instead of `&[u8]`.
+- Breaking: `MAX_CHAIN_TIP_HASHES` is 100, the limit Zebra enforces on every
+  network (`MAX_NON_FINALIZED_CHAIN_FORKS_TEST_NETWORKS`). It was 10.
+- Added `HashOrHeight`, with `From<HashOrHeight> for BlockRequest` and
+  `BlockRequest::hash_or_height()`.
+- Added `BlockAndHash::hash_display_order()`.
+- Added constructors that encode each field rule:
+  `BlockHashAndHeight::new`, `BlockAndHash::new`,
+  `NonFinalizedStateChangeRequest::new` (`None` above the limit) and
+  `MempoolChangeMessage::new`.
+- The "Protocol behavior notes" are "Zebra server facts", each citing
+  `zebra-rpc/src/indexer/methods.rs` at v7.0.0. Corrected: `chain_tip_change`
+  sends the current tip at once once Zebra's tip has changed, and a slow
+  consumer's stream ends cleanly with no status.
+- proto: byte-identical to Zebra v7.0.0 again. The two `tx_hash` and
+  `auth_digest` comment lines are Zebra's; the display-order fact moved to
+  the accessor docs. Regenerated bindings carry `#[allow(clippy::all)]` from
+  the current `prost-build`.
+
 ## 2.5.0 (2026-06-27)
 
 - Added the typed mempool layer:
