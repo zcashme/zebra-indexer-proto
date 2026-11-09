@@ -63,6 +63,18 @@ fn hash32(bytes: &[u8]) -> Option<&[u8; 32]> {
 }
 
 impl MempoolChangeMessage {
+    /// A change to the transaction whose hashes are given in display order.
+    /// No auth digest is sent as an empty field.
+    pub fn new(kind: MempoolChangeKind, tx_hash: [u8; 32], auth_digest: Option<[u8; 32]>) -> Self {
+        Self {
+            change_type: kind.into(),
+            tx_hash: tx_hash.to_vec(),
+            auth_digest: auth_digest
+                .map(|digest| digest.to_vec())
+                .unwrap_or_default(),
+        }
+    }
+
     /// Returns the kind of change, or `None` if the wire value is unknown.
     ///
     /// Unknown values are representable: proto3 enums are open, and a newer
@@ -89,6 +101,14 @@ impl MempoolChangeMessage {
 }
 
 impl BlockHashAndHeight {
+    /// A tip whose hash is given in display order.
+    pub fn new(hash: [u8; 32], height: u32) -> Self {
+        Self {
+            hash: hash.to_vec(),
+            height,
+        }
+    }
+
     /// Returns the block hash in display order, or `None` if the field is not
     /// 32 bytes.
     pub fn hash_display_order(&self) -> Option<&[u8; 32]> {
@@ -97,6 +117,14 @@ impl BlockHashAndHeight {
 }
 
 impl BlockAndHash {
+    /// A consensus-serialized block and its hash in display order.
+    pub fn new(hash: [u8; 32], data: Vec<u8>) -> Self {
+        Self {
+            hash: hash.to_vec(),
+            data,
+        }
+    }
+
     /// Returns the block hash in display order, or `None` if the field is not
     /// 32 bytes.
     pub fn hash_display_order(&self) -> Option<&[u8; 32]> {
@@ -151,6 +179,13 @@ impl BlockRequest {
 pub const MAX_CHAIN_TIP_HASHES: usize = 100;
 
 impl NonFinalizedStateChangeRequest {
+    /// A request carrying the given chain tip hashes in display order, or
+    /// `None` if there are more than [`MAX_CHAIN_TIP_HASHES`].
+    pub fn new(tips: impl IntoIterator<Item = [u8; 32]>) -> Option<Self> {
+        let chain_tip_hashes: Vec<Vec<u8>> = tips.into_iter().map(|tip| tip.to_vec()).collect();
+        (chain_tip_hashes.len() <= MAX_CHAIN_TIP_HASHES).then_some(Self { chain_tip_hashes })
+    }
+
     /// Returns this request's chain tip hashes in display order, or `None` if
     /// any hash is not 32 bytes. The count is checked separately against
     /// [`MAX_CHAIN_TIP_HASHES`].
@@ -297,5 +332,40 @@ mod tests {
             };
             assert_eq!(request.hash_or_height(), None, "{len} bytes");
         }
+    }
+
+    #[test]
+    fn constructors_round_trip_through_the_accessors() {
+        let tip = BlockHashAndHeight::new([6; 32], 7);
+        assert_eq!(tip.hash_display_order(), Some(&[6; 32]));
+        assert_eq!(tip.height, 7);
+
+        let block = BlockAndHash::new([8; 32], vec![9]);
+        assert_eq!(block.hash_display_order(), Some(&[8; 32]));
+        assert_eq!(block.data, [9]);
+
+        let change = MempoolChangeMessage::new(MempoolChangeKind::Mined, [1; 32], Some([2; 32]));
+        assert_eq!(change.kind(), Some(MempoolChangeKind::Mined));
+        assert_eq!(change.tx_hash_display_order(), Some(&[1; 32]));
+        assert_eq!(change.auth_digest_display_order(), Some(&[2; 32]));
+
+        let legacy = MempoolChangeMessage::new(MempoolChangeKind::Added, [1; 32], None);
+        assert!(legacy.auth_digest.is_empty());
+        assert_eq!(legacy.auth_digest_display_order(), None);
+    }
+
+    #[test]
+    fn a_resume_request_holds_at_most_the_limit() {
+        let full = NonFinalizedStateChangeRequest::new(vec![[3; 32]; MAX_CHAIN_TIP_HASHES])
+            .expect("the limit itself is accepted");
+        assert_eq!(
+            full.chain_tip_hashes_display_order()
+                .map(|tips| tips.count()),
+            Some(MAX_CHAIN_TIP_HASHES)
+        );
+        assert_eq!(
+            NonFinalizedStateChangeRequest::new(vec![[3; 32]; MAX_CHAIN_TIP_HASHES + 1]),
+            None
+        );
     }
 }
