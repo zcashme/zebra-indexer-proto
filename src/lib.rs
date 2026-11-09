@@ -193,20 +193,27 @@ impl NonFinalizedStateChangeRequest {
     /// A request carrying the given chain tip hashes in display order, or
     /// `None` if there are more than [`MAX_CHAIN_TIP_HASHES`].
     pub fn new(tips: impl IntoIterator<Item = [u8; 32]>) -> Option<Self> {
-        let chain_tip_hashes: Vec<Vec<u8>> = tips.into_iter().map(|tip| tip.to_vec()).collect();
+        let chain_tip_hashes: Vec<Vec<u8>> = tips
+            .into_iter()
+            .take(MAX_CHAIN_TIP_HASHES + 1)
+            .map(|tip| tip.to_vec())
+            .collect();
         (chain_tip_hashes.len() <= MAX_CHAIN_TIP_HASHES).then_some(Self { chain_tip_hashes })
     }
 
     /// Returns this request's chain tip hashes in display order, or `None` if
-    /// any hash is not 32 bytes. The count is checked separately against
-    /// [`MAX_CHAIN_TIP_HASHES`].
+    /// there are more than [`MAX_CHAIN_TIP_HASHES`] or any hash is not 32
+    /// bytes. Zebra checks in that order.
     pub fn chain_tip_hashes_display_order(&self) -> Option<impl Iterator<Item = &[u8; 32]> + '_> {
-        let all_valid = self
+        if self.chain_tip_hashes.len() > MAX_CHAIN_TIP_HASHES {
+            return None;
+        }
+        let tips: Vec<&[u8; 32]> = self
             .chain_tip_hashes
             .iter()
-            .all(|hash| hash32(hash).is_some());
-
-        all_valid.then(|| self.chain_tip_hashes.iter().filter_map(|hash| hash32(hash)))
+            .map(|hash| hash32(hash))
+            .collect::<Option<_>>()?;
+        Some(tips.into_iter())
     }
 }
 
@@ -393,8 +400,13 @@ mod tests {
             Some(MAX_CHAIN_TIP_HASHES)
         );
         assert_eq!(
-            NonFinalizedStateChangeRequest::new(vec![[3; 32]; MAX_CHAIN_TIP_HASHES + 1]),
+            NonFinalizedStateChangeRequest::new(std::iter::repeat([3; 32])),
             None
         );
+
+        let over = NonFinalizedStateChangeRequest {
+            chain_tip_hashes: vec![vec![3; 32]; MAX_CHAIN_TIP_HASHES + 1],
+        };
+        assert!(over.chain_tip_hashes_display_order().is_none());
     }
 }
