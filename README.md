@@ -29,8 +29,8 @@ let mut client = ZebraClient::connect("http://127.0.0.1:8230").await?;
 // Chain tip change stream
 let mut stream = client.chain_tip_change(Empty {}).await?.into_inner();
 while let Some(tip) = stream.message().await? {
-    let hash = tip.hash_display_order().expect("32 bytes");
-    println!("tip: height={} hash={}", tip.height, hex::encode(hash));
+    let hash: &[u8; 32] = tip.hash_display_order().expect("32 bytes");
+    println!("tip: height={} hash={:02x?}", tip.height, hash);
 }
 ```
 
@@ -42,7 +42,8 @@ Byte fields carry rules prost can't type. The crate encodes and decodes them:
 use zebra_indexer_proto::{BlockRequest, HashOrHeight};
 
 // A height is 4 big-endian bytes; a hash is 32 bytes in display order.
-let request = BlockRequest::from(HashOrHeight::Height(1000));
+// `new` refuses a height above MAX_BLOCK_HEIGHT, which Zebra rejects.
+let request = BlockRequest::new(HashOrHeight::Height(1000)).expect("a height Zebra serves");
 let block = client.get_block(request).await?.into_inner();
 let hash: &[u8; 32] = block.hash_display_order().expect("32 bytes");
 ```
