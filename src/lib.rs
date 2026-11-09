@@ -14,18 +14,21 @@
 //! How Zebra's server behaves where the proto is silent, as of Zebra
 //! v7.0.0 (`zebra-rpc/src/indexer/methods.rs`).
 //!
-//! - `chain_tip_change` sends the current tip at once if Zebra's tip has
-//!   changed since the indexer server started. Each subscription waits on a
-//!   clone of the server's one `LatestChainTip` (lines 53 and 57), and a
-//!   cloned watch receiver keeps the original's last-seen version.
+//! - `chain_tip_change` sends the current tip at once whenever Zebra has a
+//!   tip. Each subscription waits on a clone of the server's one
+//!   `LatestChainTip` (lines 53 and 57), whose watch receiver starts with
+//!   the tip unseen (`zebra-state/src/service/chain_tip.rs:161–172`).
 //! - `non_finalized_state_change` rejects more than
 //!   [`MAX_CHAIN_TIP_HASHES`] hashes, or any hash that is not 32 bytes,
 //!   with `invalid_argument` (lines 302 and 319).
-//! - A stream ends with `unavailable` when Zebra's internal channel closes
-//!   or the subscription fails (lines 89, 127, 168, 234).
+//! - A stream ends with `unavailable` when Zebra's internal channel closes,
+//!   the subscription fails, or a `mempool_change` consumer falls more than
+//!   20 changes behind Zebra's broadcast (lines 89, 127, 168, 188, 234).
 //! - A stream ends cleanly, with no status, when the consumer leaves a
 //!   message unsent for 60 seconds behind a 64-message buffer (lines 23,
 //!   31, 75, 154, 219).
+//! - Zebra's own client resubscribes after any stream end, clean or not
+//!   (`zebra-rpc/src/sync.rs:147–160, 319–334`).
 //!
 
 pub mod zebra {
