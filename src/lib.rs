@@ -103,13 +103,11 @@ impl BlockHashAndHeight {
 /// The maximum number of chain tip hashes a [`NonFinalizedStateChangeRequest`]
 /// may carry.
 ///
-/// Zebra's non-finalized state holds at most this many chains
-/// (`MAX_NON_FINALIZED_CHAIN_FORKS` in `zebra-state`), so a caller can never
-/// legitimately have more known tips than this. The server rejects larger
-/// requests with `invalid_argument` — bounding untrusted input up front
-/// rather than allocating a set sized by the request — so build requests
-/// against this limit rather than discovering it as a stream error.
-pub const MAX_CHAIN_TIP_HASHES: usize = 10;
+/// Zebra v7.0.0 rejects a larger request with `invalid_argument` on every
+/// network (`zebra-rpc/src/indexer/methods.rs:302`), against
+/// `MAX_NON_FINALIZED_CHAIN_FORKS_TEST_NETWORKS`
+/// (`zebra-state/src/constants.rs:113`).
+pub const MAX_CHAIN_TIP_HASHES: usize = 100;
 
 impl NonFinalizedStateChangeRequest {
     /// Returns this request's chain tip hashes as 32-byte display-order
@@ -237,11 +235,5 @@ mod tests {
             chain_tip_hashes: vec![hash(), vec![3; 31]],
         };
         assert!(req.chain_tip_hashes_display_order().is_none());
-
-        // More hashes than Zebra has non-finalized chains is never legitimate.
-        let req = NonFinalizedStateChangeRequest {
-            chain_tip_hashes: (0..=MAX_CHAIN_TIP_HASHES).map(|_| hash()).collect(),
-        };
-        assert!(req.chain_tip_hashes.len() > MAX_CHAIN_TIP_HASHES);
     }
 }
