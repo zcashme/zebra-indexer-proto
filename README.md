@@ -8,13 +8,13 @@ and block-fetch RPCs Zebra serves on its indexer endpoint (default
 
 Zebra defines the interface in `zebra-rpc/proto/indexer.proto` and generates
 its own bindings internally. This crate vendors it, generates the bindings once, and commits
-them. `
+them.
 
 ## Quick start
 
 ```toml
 [dependencies]
-zebra-indexer-proto = "2.5"
+zebra-indexer-proto = "3.0"
 ```
 
 `ZebraClient` pins the transport for you without having to keep a 'tonic' dependency.
@@ -29,8 +29,22 @@ let mut client = ZebraClient::connect("http://127.0.0.1:8230").await?;
 // Chain tip change stream
 let mut stream = client.chain_tip_change(Empty {}).await?.into_inner();
 while let Some(tip) = stream.message().await? {
-    println!("tip: height={} hash={:x}", tip.height, tip.hash);
+    let hash = tip.hash_display_order().expect("32 bytes");
+    println!("tip: height={} hash={}", tip.height, hex::encode(hash));
 }
+```
+
+### Field rules
+
+Byte fields carry rules prost can't type. The crate encodes and decodes them:
+
+```rust
+use zebra_indexer_proto::{BlockRequest, HashOrHeight};
+
+// A height is 4 big-endian bytes; a hash is 32 bytes in display order.
+let request = BlockRequest::from(HashOrHeight::Height(1000));
+let block = client.get_block(request).await?.into_inner();
+let hash: &[u8; 32] = block.hash_display_order().expect("32 bytes");
 ```
 
 ### Typed mempool changes
@@ -45,13 +59,13 @@ use zebra_indexer_proto::{Empty, MempoolChangeKind, ZebraClient};
 let mut stream = client.mempool_change(Empty {}).await?.into_inner();
 while let Some(change) = stream.message().await? {
     match change.kind() {
-        Some(MempoolChangeKind::Added) => { /* tx entered the mempool */ }
-        Some(MempoolChangeKind::Invalidated) => { /* pending observations withdrawn */ }
-        Some(MempoolChangeKind::Mined) => { /* confirmed into a best-chain block */ }
+        Some(MempoolChangeKind::Added) => { /* added to the mempool */ }
+        Some(MempoolChangeKind::Invalidated) => { /* invalidated and rejected from the mempool */ }
+        Some(MempoolChangeKind::Mined) => { /* mined into a block on the best chain */ }
         None => { /* unknown value from a newer Zebra */ }
     }
-    // Display order, as with every other hash in this protocol.
-    let tx_hash = change.tx_hash_display_order().expect("32 bytes");
+    // Display order, as Zebra v7.0.0 sends it.
+    let tx_hash: &[u8; 32] = change.tx_hash_display_order().expect("32 bytes");
 }
 ```
 
@@ -96,19 +110,18 @@ let reflection = tonic_reflection::server::Builder::configure()
 
 | RPC | Type | What it does |
 |---|---|---|
-| `ChainTipChange` | stream | push `(hash, height)` on every best-chain tip change |
-| `NonFinalizedStateChange` | stream | stream blocks in non-finalized state, resumable via known tip hashes |
-| `MempoolChange` | stream | notify on tx added / invalidated / mined |
-| `GetBlock` | unary | fetch a block by hash (32 bytes, display order) or height (4 bytes, big-endian) |
+| `ChainTipChange` | stream | notifies listeners of chain tip changes |
+| `NonFinalizedStateChange` | stream | notifies listeners of new blocks in the non-finalized state, after the chain tips the caller already has |
+| `MempoolChange` | stream | notifies listeners of mempool changes |
+| `GetBlock` | unary | returns the block with the given hash or height from the best chain |
 
 ## Staying in sync with Zebra
 
 `proto/indexer.proto` is a byte-level copy of
 [zebra-rpc/proto/indexer.proto](https://github.com/ZcashFoundation/zebra/blob/main/zebra-rpc/proto/indexer.proto)
-(Zebra vendored this crate's file for v6.3.0, so changes can land in either
-place — whoever changes it opens the sync PR). CI diffs the two daily and
-fails if they drift, so changes surface here quickly. When the change lands
-here first, keep the diff open on the Zebra side until it syncs.
+at a tagged Zebra release, currently v7.0.0. The Zebra server facts in the
+crate docs cite that release too. CI diffs the proto against Zebra's `main`
+daily, so an upstream change surfaces before the next release.
 
 To update the bindings:
 
