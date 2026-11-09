@@ -21,6 +21,8 @@
 //! - `non_finalized_state_change` rejects more than
 //!   [`MAX_CHAIN_TIP_HASHES`] hashes, or any hash that is not 32 bytes,
 //!   with `invalid_argument` (lines 302 and 319).
+//! - `get_block` rejects a height above [`MAX_BLOCK_HEIGHT`] with
+//!   `invalid_argument` (line 258).
 //! - A stream ends with `unavailable` when Zebra's internal channel closes,
 //!   the subscription fails, or a `mempool_change` consumer falls more than
 //!   20 changes behind Zebra's broadcast (lines 89, 127, 168, 188, 234).
@@ -147,31 +149,34 @@ pub enum HashOrHeight {
     Height(u32),
 }
 
-impl From<HashOrHeight> for BlockRequest {
-    /// A hash is its 32 bytes; a height is 4 big-endian bytes.
-    fn from(block: HashOrHeight) -> Self {
-        let hash_or_height = match block {
-            HashOrHeight::Hash(hash) => hash.to_vec(),
-            HashOrHeight::Height(height) => height.to_be_bytes().to_vec(),
-        };
-        Self { hash_or_height }
-    }
-}
+/// The highest block height Zebra v7.0.0 serves: `block::Height::MAX`
+/// (`zebra-chain/src/block/height.rs:67`), checked by `get_block`
+/// (`zebra-rpc/src/indexer/methods.rs:258`).
+pub const MAX_BLOCK_HEIGHT: u32 = u32::MAX / 2;
 
 impl BlockRequest {
+    /// A request for `block`: a hash is its 32 bytes, a height is 4
+    /// big-endian bytes. `None` for a height above [`MAX_BLOCK_HEIGHT`].
+    pub fn new(block: HashOrHeight) -> Option<Self> {
+        let hash_or_height = match block {
+            HashOrHeight::Hash(hash) => hash.to_vec(),
+            HashOrHeight::Height(height) if height <= MAX_BLOCK_HEIGHT => {
+                height.to_be_bytes().to_vec()
+            }
+            HashOrHeight::Height(_) => return None,
+        };
+        Some(Self { hash_or_height })
+    }
+
     /// Returns the block this request names, or `None` if the field is
-    /// neither 32 nor 4 bytes.
+    /// neither 32 nor 4 bytes, or names a height above [`MAX_BLOCK_HEIGHT`].
     pub fn hash_or_height(&self) -> Option<HashOrHeight> {
-        match self.hash_or_height.len() {
-            32 => hash32(&self.hash_or_height).map(|hash| HashOrHeight::Hash(*hash)),
-            4 => self
-                .hash_or_height
-                .as_slice()
-                .try_into()
-                .ok()
-                .map(|height| HashOrHeight::Height(u32::from_be_bytes(height))),
-            _ => None,
+        let bytes = self.hash_or_height.as_slice();
+        if let Ok(hash) = <[u8; 32]>::try_from(bytes) {
+            return Some(HashOrHeight::Hash(hash));
         }
+        let height = u32::from_be_bytes(bytes.try_into().ok()?);
+        (height <= MAX_BLOCK_HEIGHT).then_some(HashOrHeight::Height(height))
     }
 }
 
@@ -324,11 +329,11 @@ mod tests {
 
     #[test]
     fn block_requests_round_trip_on_the_wire() {
-        let by_height = BlockRequest::from(HashOrHeight::Height(1000));
+        let by_height = BlockRequest::new(HashOrHeight::Height(1000)).unwrap();
         assert_eq!(by_height.hash_or_height, [0, 0, 3, 232]);
         assert_eq!(by_height.hash_or_height(), Some(HashOrHeight::Height(1000)));
 
-        let by_hash = BlockRequest::from(HashOrHeight::Hash([5; 32]));
+        let by_hash = BlockRequest::new(HashOrHeight::Hash([5; 32])).unwrap();
         assert_eq!(by_hash.hash_or_height, [5; 32]);
         assert_eq!(by_hash.hash_or_height(), Some(HashOrHeight::Hash([5; 32])));
 
@@ -338,6 +343,24 @@ mod tests {
             };
             assert_eq!(request.hash_or_height(), None, "{len} bytes");
         }
+    }
+
+    #[test]
+    fn block_requests_stop_at_the_highest_height_zebra_serves() {
+        let top = BlockRequest::new(HashOrHeight::Height(MAX_BLOCK_HEIGHT)).unwrap();
+        assert_eq!(
+            top.hash_or_height(),
+            Some(HashOrHeight::Height(MAX_BLOCK_HEIGHT))
+        );
+
+        assert_eq!(
+            BlockRequest::new(HashOrHeight::Height(MAX_BLOCK_HEIGHT + 1)),
+            None
+        );
+        let above = BlockRequest {
+            hash_or_height: (MAX_BLOCK_HEIGHT + 1).to_be_bytes().to_vec(),
+        };
+        assert_eq!(above.hash_or_height(), None);
     }
 
     #[test]
