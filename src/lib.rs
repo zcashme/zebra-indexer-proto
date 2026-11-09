@@ -104,6 +104,43 @@ impl BlockAndHash {
     }
 }
 
+/// The block a [`BlockRequest`] names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HashOrHeight {
+    /// A block hash in display order.
+    Hash([u8; 32]),
+    /// A block height.
+    Height(u32),
+}
+
+impl From<HashOrHeight> for BlockRequest {
+    /// A hash is its 32 bytes; a height is 4 big-endian bytes.
+    fn from(block: HashOrHeight) -> Self {
+        let hash_or_height = match block {
+            HashOrHeight::Hash(hash) => hash.to_vec(),
+            HashOrHeight::Height(height) => height.to_be_bytes().to_vec(),
+        };
+        Self { hash_or_height }
+    }
+}
+
+impl BlockRequest {
+    /// Returns the block this request names, or `None` if the field is
+    /// neither 32 nor 4 bytes.
+    pub fn hash_or_height(&self) -> Option<HashOrHeight> {
+        match self.hash_or_height.len() {
+            32 => hash32(&self.hash_or_height).map(|hash| HashOrHeight::Hash(*hash)),
+            4 => self
+                .hash_or_height
+                .as_slice()
+                .try_into()
+                .ok()
+                .map(|height| HashOrHeight::Height(u32::from_be_bytes(height))),
+            _ => None,
+        }
+    }
+}
+
 /// The maximum number of chain tip hashes a [`NonFinalizedStateChangeRequest`]
 /// may carry.
 ///
@@ -242,5 +279,23 @@ mod tests {
             chain_tip_hashes: vec![hash(), vec![3; 31]],
         };
         assert!(req.chain_tip_hashes_display_order().is_none());
+    }
+
+    #[test]
+    fn block_requests_round_trip_on_the_wire() {
+        let by_height = BlockRequest::from(HashOrHeight::Height(1000));
+        assert_eq!(by_height.hash_or_height, [0, 0, 3, 232]);
+        assert_eq!(by_height.hash_or_height(), Some(HashOrHeight::Height(1000)));
+
+        let by_hash = BlockRequest::from(HashOrHeight::Hash([5; 32]));
+        assert_eq!(by_hash.hash_or_height, [5; 32]);
+        assert_eq!(by_hash.hash_or_height(), Some(HashOrHeight::Hash([5; 32])));
+
+        for len in [0, 3, 5, 31, 33] {
+            let request = BlockRequest {
+                hash_or_height: vec![0; len],
+            };
+            assert_eq!(request.hash_or_height(), None, "{len} bytes");
+        }
     }
 }
