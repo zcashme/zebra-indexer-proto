@@ -14,8 +14,10 @@
 //! How Zebra's server behaves where the proto is silent, as of Zebra
 //! v7.0.0 (`zebra-rpc/src/indexer/methods.rs`).
 //!
-//! - `chain_tip_change` sends no initial message: the first message is the
-//!   first tip change after subscribing (line 57).
+//! - `chain_tip_change` sends the current tip at once if Zebra's tip has
+//!   changed since the indexer server started. Each subscription waits on a
+//!   clone of the server's one `LatestChainTip` (lines 53 and 57), and a
+//!   cloned watch receiver keeps the original's last-seen version.
 //! - `non_finalized_state_change` rejects more than
 //!   [`MAX_CHAIN_TIP_HASHES`] hashes, or any hash that is not 32 bytes,
 //!   with `invalid_argument` (lines 302 and 319).
