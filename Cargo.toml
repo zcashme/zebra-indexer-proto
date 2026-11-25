@@ -18,7 +18,7 @@ tonic-prost = "0.14"
 
 [features]
 default = []
-# Enable to regenerate the committed bindings from proto/indexer.proto.
+# Enable to regenerate the committed bindings from the protos in proto/.
 # Requires `protoc` to be installed on the system.
 # Maintainer usage: cargo build --features regenerate
 regenerate = ["dep:tonic-prost-build"]

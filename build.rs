@@ -10,6 +10,8 @@
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=proto/indexer.proto");
+    println!("cargo:rerun-if-changed=proto/service.proto");
+    println!("cargo:rerun-if-changed=proto/compact_formats.proto");
 
     #[cfg(feature = "regenerate")]
     {
@@ -28,6 +30,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .out_dir(&generated_dir)
             .file_descriptor_set_path(generated_dir.join("indexer_descriptor.bin"))
             .compile_protos(&["proto/indexer.proto"], &["proto/"])?;
+
+        // A separate run, so each service keeps its own descriptor set.
+        // This produces:
+        //   proto/__generated__/cash.z.wallet.sdk.rpc.rs
+        //   proto/__generated__/lightwalletd_descriptor.bin
+        tonic_prost_build::configure()
+            .type_attribute(".", "#[derive(serde::Deserialize, serde::Serialize)]")
+            .out_dir(&generated_dir)
+            .file_descriptor_set_path(generated_dir.join("lightwalletd_descriptor.bin"))
+            .compile_protos(&["proto/service.proto"], &["proto/"])?;
 
         println!(
             "cargo:warning=Regenerated zebra-indexer-proto bindings into proto/__generated__/"

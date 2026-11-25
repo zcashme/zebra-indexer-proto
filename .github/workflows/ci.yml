@@ -32,7 +32,8 @@ jobs:
       - name: Committed bindings match the proto
         run: |
           cargo build --locked --features regenerate
-          git diff --exit-code -- proto/__generated__/
+          git status --porcelain -- proto/__generated__/
+          test -z "$(git status --porcelain -- proto/__generated__/)"
 
       # diff -r also fails on a proto Zebra has and this crate doesn't vendor.
       - name: Protos match Zebra at ZEBRA_TAG
