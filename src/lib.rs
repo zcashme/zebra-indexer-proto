@@ -228,6 +228,161 @@ impl NonFinalizedStateChangeRequest {
     }
 }
 
+// ============================================================================
+// lightwalletd field rules
+//
+// The same gap as the Indexer's: a hash's byte order, a height's sentinel
+// values, a field's range and an open enum are rules prost can't type.
+// Most `CompactTxStreamer` hashes are in internal (little-endian) byte
+// order, the reverse of the display order the Indexer uses; the one byte
+// field in display order is `SubtreeRoot.completing_block_hash`.
+// ============================================================================
+
+/// The largest transaction Zebra v7.0.0 accepts in `SendTransaction`:
+/// `block::MAX_BLOCK_BYTES` (`zebra-chain/src/block/serialize.rs:24`),
+/// checked before submission with `invalid_argument`
+/// (`zebra-rpc/src/lightwalletd/methods.rs:51` and 228).
+pub const MAX_RAW_TRANSACTION_BYTES: usize = 2_000_000;
+
+impl lightwalletd::BlockId {
+    /// A block by height, for `GetBlock`, `GetBlockNullifiers`,
+    /// `GetBlockRange`, `GetBlockRangeNullifiers` and `GetTreeState`. `None`
+    /// for 0, which those calls read as neither field set and reject with
+    /// `invalid_argument`, and for a height above [`MAX_BLOCK_HEIGHT`]
+    /// (`zebra-rpc/src/lightwalletd/methods.rs:616–629`). `GetBlock`,
+    /// `GetBlockNullifiers` and `GetTreeState` reach genesis only by hash;
+    /// the block ranges take no hash, so they can't return genesis.
+    ///
+    /// A `TransparentAddressBlockFilter` range reads height 0 differently:
+    /// as an open end (lines 818–831). Leave `start` or `end` as `None`, or
+    /// use `BlockId::default()`, for the full range.
+    pub fn from_height(height: u32) -> Option<Self> {
+        (height != 0 && height <= MAX_BLOCK_HEIGHT).then(|| Self {
+            height: height.into(),
+            hash: Vec::new(),
+        })
+    }
+
+    /// A block by hash, in internal byte order, for `GetBlock`,
+    /// `GetBlockNullifiers` and `GetTreeState`. Zebra reads a non-empty hash
+    /// before the height (`zebra-rpc/src/lightwalletd/methods.rs:607–615`).
+    ///
+    /// Ranges take heights only: a hash in a `BlockRange` or a
+    /// `TransparentAddressBlockFilter` range is `invalid_argument` (lines
+    /// 764–766 and 823–826).
+    pub fn from_hash_internal_order(hash: [u8; 32]) -> Self {
+        Self {
+            height: 0,
+            hash: hash.to_vec(),
+        }
+    }
+
+    /// Returns the block hash in internal byte order, or `None` if the field
+    /// is not 32 bytes. Zebra v7.0.0's `GetLatestBlock` sends it so
+    /// (`zebra-rpc/src/lightwalletd/methods.rs:92`).
+    pub fn hash_internal_order(&self) -> Option<&[u8; 32]> {
+        hash32(&self.hash)
+    }
+}
+
+impl lightwalletd::TxFilter {
+    /// A lookup by transaction id, in internal byte order: the only
+    /// specification Zebra supports (`zebra-rpc/src/lightwalletd/methods.rs:154–161`).
+    pub fn from_txid_internal_order(txid: [u8; 32]) -> Self {
+        Self {
+            hash: txid.to_vec(),
+            ..Default::default()
+        }
+    }
+}
+
+/// Where a [`lightwalletd::RawTransaction`] is, from its `height` field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TxLocation {
+    /// In the mempool: height 0. The genesis block's height is also 0, and
+    /// Zebra sends it for the genesis coinbase
+    /// (`zebra-rpc/src/lightwalletd/methods.rs:173`), so that one mined
+    /// transaction reads as `Mempool` too.
+    Mempool,
+    /// Mined on a fork that is not the best chain: height `u64::MAX`.
+    OtherChain,
+    /// Mined in the best chain at this height.
+    BestChain(u32),
+}
+
+impl lightwalletd::RawTransaction {
+    /// A transaction to submit. `None` above [`MAX_RAW_TRANSACTION_BYTES`].
+    pub fn new(data: Vec<u8>) -> Option<Self> {
+        (data.len() <= MAX_RAW_TRANSACTION_BYTES).then_some(Self { data, height: 0 })
+    }
+
+    /// Returns where the transaction is, or `None` for a height that is
+    /// neither sentinel and above [`MAX_BLOCK_HEIGHT`].
+    ///
+    /// The proto defines the sentinels. Zebra v7.0.0 sets them in
+    /// `GetTransaction` (`zebra-rpc/src/lightwalletd/methods.rs:206` and 213)
+    /// and sends height 0 for every `GetMempoolStream` transaction (line
+    /// 1125), where the proto's comment says the latest block height. Height
+    /// 0 is ambiguous on the wire: the genesis coinbase is mined at 0, so
+    /// `GetTransaction` for it also reads as [`TxLocation::Mempool`].
+    pub fn location(&self) -> Option<TxLocation> {
+        match self.height {
+            0 => Some(TxLocation::Mempool),
+            u64::MAX => Some(TxLocation::OtherChain),
+            height => u32::try_from(height)
+                .ok()
+                .filter(|height| *height <= MAX_BLOCK_HEIGHT)
+                .map(TxLocation::BestChain),
+        }
+    }
+}
+
+impl lightwalletd::SendResponse {
+    /// `Ok` with the message when `errorCode` is zero, which the proto
+    /// defines as success; otherwise `Err` with the code and message.
+    pub fn result(&self) -> Result<&str, (i32, &str)> {
+        match self.error_code {
+            0 => Ok(&self.error_message),
+            code => Err((code, &self.error_message)),
+        }
+    }
+}
+
+impl lightwalletd::GetSubtreeRootsArg {
+    /// A request for `protocol`'s subtree roots from `start_index`. Zebra
+    /// rejects a start index above `u16::MAX` with `invalid_argument` and
+    /// caps `max_entries` at `u16::MAX` (`zebra-rpc/src/lightwalletd/methods.rs:460–471`),
+    /// so both are `u16` here. A `max_entries` of 0 means no limit.
+    pub fn new(
+        protocol: lightwalletd::ShieldedProtocol,
+        start_index: u16,
+        max_entries: u16,
+    ) -> Self {
+        Self {
+            start_index: start_index.into(),
+            shielded_protocol: protocol.into(),
+            max_entries: max_entries.into(),
+        }
+    }
+
+    /// Returns the pool, or `None` if the wire value is unknown. The
+    /// generated `shielded_protocol()` returns `Sapling` for an unknown
+    /// value.
+    pub fn protocol(&self) -> Option<lightwalletd::ShieldedProtocol> {
+        lightwalletd::ShieldedProtocol::try_from(self.shielded_protocol).ok()
+    }
+}
+
+impl lightwalletd::SubtreeRoot {
+    /// Returns the hash of the block that completed the subtree, in display
+    /// order, or `None` if the field is not 32 bytes. Unlike the other
+    /// `CompactTxStreamer` hashes, Zebra v7.0.0 sends this one in display
+    /// order, as lightwalletd does (`zebra-rpc/src/lightwalletd/methods.rs:526–528`).
+    pub fn completing_block_hash_display_order(&self) -> Option<&[u8; 32]> {
+        hash32(&self.completing_block_hash)
+    }
+}
+
 pub use tonic::transport::Channel;
 
 pub type ZebraClient = zebra::indexer::rpc::indexer_client::IndexerClient<Channel>;
