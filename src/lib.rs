@@ -1,6 +1,10 @@
-//! Rust bindings for Zebra's indexer gRPC interface.
+//! Rust bindings for Zebra's two gRPC services: the Indexer, and the
+//! lightwalletd `CompactTxStreamer`.
 //!
-//! Generated from `indexer.proto` (vendored from Zebra).
+//! Generated from `indexer.proto`, `service.proto` and
+//! `compact_formats.proto` (vendored from Zebra). The Indexer's types are at
+//! the crate root; the `CompactTxStreamer`'s are in [`lightwalletd`], since
+//! both define `Empty`.
 //!
 //! The generated code is **committed** under `proto/__generated__/`.
 //! A normal `cargo build` (or `cargo add zebra-indexer-proto`) has no
@@ -11,8 +15,9 @@
 //!
 //! # Zebra server facts
 //!
-//! How Zebra's server behaves where the proto is silent, as of Zebra
-//! v7.0.0 (`zebra-rpc/src/indexer/methods.rs`).
+//! How Zebra's Indexer server behaves where the proto is silent, as of Zebra
+//! v7.0.0 (`zebra-rpc/src/indexer/methods.rs`). The `CompactTxStreamer`'s
+//! are in [`lightwalletd`].
 //!
 //! - `chain_tip_change` sends the current tip at once whenever Zebra has a
 //!   tip. Each subscription waits on a clone of the server's one
@@ -42,6 +47,12 @@ pub mod zebra {
 }
 
 pub use zebra::indexer::rpc::*;
+
+/// Bindings for the lightwalletd `CompactTxStreamer` service, package
+/// `cash.z.wallet.sdk.rpc`, as Zebra serves it.
+pub mod lightwalletd {
+    include!("../proto/__generated__/cash.z.wallet.sdk.rpc.rs");
+}
 
 // ============================================================================
 // Typed accessors
@@ -225,6 +236,12 @@ pub use tonic::transport::Error as ConnectError;
 
 pub const FILE_DESCRIPTOR_SET: &[u8] =
     include_bytes!("../proto/__generated__/indexer_descriptor.bin");
+
+pub type LightwalletdClient =
+    lightwalletd::compact_tx_streamer_client::CompactTxStreamerClient<Channel>;
+
+pub const LIGHTWALLETD_FILE_DESCRIPTOR_SET: &[u8] =
+    include_bytes!("../proto/__generated__/lightwalletd_descriptor.bin");
 
 #[cfg(test)]
 mod tests {
