@@ -1,13 +1,13 @@
 [package]
 name = "zebra-indexer-proto"
-version = "3.0.0"
+version = "3.1.0"
 edition = "2021"
 rust-version = "1.85"
-description = "Rust bindings for Zebra's indexer gRPC protocol buffers"
+description = "Rust bindings for Zebra's indexer and lightwalletd gRPC protocol buffers"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/zcashme/zebra-indexer-proto"
-keywords = ["zebra", "zcash", "grpc", "indexer"]
+keywords = ["zebra", "zcash", "grpc", "indexer", "lightwalletd"]
 categories = ["cryptography::cryptocurrencies"]
 
 [dependencies]
