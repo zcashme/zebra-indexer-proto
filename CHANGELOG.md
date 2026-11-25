@@ -1,7 +1,33 @@
 # Changelog
 
-Notable changes to `zebra-indexer-proto`. The crate tracks Zebra's indexer
-gRPC interface, not Zebra's own version numbers.
+Notable changes to `zebra-indexer-proto`. The crate tracks Zebra's gRPC
+interfaces, not Zebra's own version numbers.
+
+## 3.1.0 (2026-11-25)
+
+Checked against Zebra v7.0.0.
+
+- Added the `lightwalletd` module: bindings for the `CompactTxStreamer`
+  service zebrad serves since v6.4.0, from Zebra's `service.proto` and
+  `compact_formats.proto` (package `cash.z.wallet.sdk.rpc`). Its generated
+  types stay in the module because both packages define `Empty`; the
+  Indexer's root items are unchanged.
+- Added at the crate root: `LightwalletdClient`,
+  `LIGHTWALLETD_FILE_DESCRIPTOR_SET`, `TxLocation` and
+  `MAX_RAW_TRANSACTION_BYTES`.
+- Added field rules: `BlockId::from_height`, `from_hash_internal_order` and
+  `hash_internal_order`; `TxFilter::from_txid_internal_order`;
+  `RawTransaction::new` (`None` above `MAX_RAW_TRANSACTION_BYTES`) and
+  `RawTransaction::location()` returning `TxLocation`;
+  `SendResponse::result()`; `GetSubtreeRootsArg::new` (a `u16` start index
+  and entry limit, Zebra's bounds) and `protocol()`;
+  `SubtreeRoot::completing_block_hash_display_order()`, the one
+  display-order hash.
+- The `lightwalletd` module docs list Zebra server facts, each citing Zebra
+  v7.0.0.
+- CI compares all of Zebra's `zebra-rpc/proto` at `ZEBRA_TAG` with `proto/`,
+  so a proto Zebra adds fails the build. The bindings check also fails on
+  generated files that are new and untracked.
 
 ## 3.0.0 (2026-11-09)
 
