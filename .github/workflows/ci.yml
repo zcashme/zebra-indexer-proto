@@ -1,6 +1,6 @@
 # Tests, and the two things this crate promises:
-#   1. the committed generated code matches proto/indexer.proto
-#   2. proto/indexer.proto matches Zebra's at ZEBRA_TAG
+#   1. the committed generated code matches the protos
+#   2. proto/ matches Zebra's zebra-rpc/proto at ZEBRA_TAG
 
 name: CI
 
@@ -34,11 +34,13 @@ jobs:
           cargo build --locked --features regenerate
           git diff --exit-code -- proto/__generated__/
 
-      - name: Proto matches Zebra at ZEBRA_TAG
+      # diff -r also fails on a proto Zebra has and this crate doesn't vendor.
+      - name: Protos match Zebra at ZEBRA_TAG
         run: |
-          curl -fsSL -o "$RUNNER_TEMP/indexer.proto" \
-            "https://raw.githubusercontent.com/ZcashFoundation/zebra/$ZEBRA_TAG/zebra-rpc/proto/indexer.proto"
-          if ! diff proto/indexer.proto "$RUNNER_TEMP/indexer.proto"; then
-            echo "::error::proto/indexer.proto differs from Zebra $ZEBRA_TAG"
+          git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$ZEBRA_TAG" --filter=blob:none --sparse \
+            https://github.com/ZcashFoundation/zebra.git "$RUNNER_TEMP/zebra"
+          git -C "$RUNNER_TEMP/zebra" sparse-checkout set zebra-rpc/proto
+          if ! diff -r --exclude=__generated__ "$RUNNER_TEMP/zebra/zebra-rpc/proto" proto; then
+            echo "::error::proto/ differs from Zebra $ZEBRA_TAG zebra-rpc/proto"
             exit 1
           fi
